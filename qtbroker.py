@@ -2,7 +2,8 @@ from collections import Iterable, OrderedDict
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
                              QListWidget, QListWidgetItem, QTabWidget,
-                             QCheckBox)
+                             QCheckBox, QPushButton, QLabel, QFileDialog,
+                             QMessageBox)
 from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
@@ -78,7 +79,8 @@ def view_header(header):
 
 
 class HeaderViewerWidget:
-    def __init__(self, dispatcher):
+    def __init__(self, dispatcher, db=None):
+        self.db = db
         self.dispatcher = dispatcher
         self._tabs = QTabWidget()
         self._widget = QWidget()
@@ -86,11 +88,56 @@ class HeaderViewerWidget:
         self._tree.setAlternatingRowColors(True)
         self._figures = {}
         self._overplot = {}
+        self._header = None  # the current header, used by export functions
 
+        export_csv_btn = QPushButton('CSV')
+        export_csv_btn.clicked.connect(self._export_csv)
+        export_xlsx_btn = QPushButton('Excel')
+        export_xlsx_btn.clicked.connect(self._export_xlsx)
+        self._export_btns = [export_csv_btn, export_xlsx_btn]
+        # Disable buttons until first data set is loaded.
+        [btn.setEnabled(False) for btn in self._export_btns]
+
+        tree_container = QVBoxLayout()
+        export_container = QHBoxLayout()
+        export_container.addWidget(export_csv_btn)
+        export_container.addWidget(export_xlsx_btn)
         layout = QHBoxLayout()
-        layout.addWidget(self._tree)
+        tree_container.addWidget(QLabel("View Header (metadata):"))
+        tree_container.addWidget(self._tree)
+        tree_container.addWidget(QLabel("Export Events (data):"))
+        tree_container.addLayout(export_container)
+        layout.addLayout(tree_container)
         layout.addWidget(self._tabs)
         self._widget.setLayout(layout)
+
+    @pyqtSlot()
+    def _export_csv(self):
+        if self._header is None:
+            # no data loaded yet
+            return
+        fp, _ = QFileDialog.getSaveFileName(self._widget, 'Export CSV')
+        self.db.get_table(self._header).to_csv(fp)
+
+    @pyqtSlot()
+    def _export_xlsx(self):
+        if self._header is None:
+            # no data loaded yet
+            return
+        try:
+            import openpyxl
+        except ImportError:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText("Feature Not Available")
+            msg.setInformativeText("The Python package openpyxl must be "
+                                   "installed to enable Excel export. Use "
+                                   "CSV export instead.")
+            msg.setWindowTitle("Error")
+            msg.exec_()
+        else:
+            fp, _ = QFileDialog.getSaveFileName(self._widget, 'Export XLSX')
+            self.db.get_table(self._header).to_xlsx(fp)
 
     def _figure(self, name):
         "matching plt.figure API"
@@ -102,6 +149,8 @@ class HeaderViewerWidget:
         return fig
 
     def __call__(self, header):
+        [btn.setEnabled(True) for btn in self._export_btns]
+        self._header = header
         self.dispatcher(header, self._figure)
         fill_widget(self._tree, header)
 
@@ -154,7 +203,7 @@ class HeaderViewerWindow(HeaderViewerWidget):
 class BrowserWidget:
     def __init__(self, db, dispatcher, item_template):
         self.db = db
-        self._hvw = HeaderViewerWidget(dispatcher)
+        self._hvw = HeaderViewerWidget(dispatcher, db)
         self.dispatcher = dispatcher
         self.item_template = item_template
         self._results = QListWidget()
@@ -195,6 +244,8 @@ class BrowserWidget:
     @pyqtSlot()
     def _on_results_selection_changed(self):
         row_index = self._results.currentRow()
+        if row_index == -1:  # This means None. Do not update the viewer.
+            return
         header = self._headers[row_index]
         self._hvw(header)
 
