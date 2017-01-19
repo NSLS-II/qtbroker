@@ -13,6 +13,11 @@ from matplotlib.backends.backend_qt5agg import (
 from matplotlib.backends import qt_compat
 
 
+class Placeholder:
+    def __init__(self):
+        self.widget = QWidget()
+
+
 def fill_item(item, value):
     """
     Display a dictionary as a QtTreeWidget
@@ -70,60 +75,39 @@ def fill_widget(widget, value):
     fill_item(widget.invisibleRootItem(), value)
 
 
-def view_header(header):
-    widget = QTreeWidget()
-    widget.setAlternatingRowColors(True)
-    fill_widget(widget, header)
-    widget.show()
-    return widget
+class TableExportWidget:
+    """
+    A Widget with buttons for exporting run data to tabular formats.
 
-
-class HeaderViewerWidget:
-    def __init__(self, dispatcher, db=None):
-        self.db = db
-        self.dispatcher = dispatcher
-        self._tabs = QTabWidget()
-        self._widget = QWidget()
-        self._tree = QTreeWidget()
-        self._tree.setAlternatingRowColors(True)
-        self._figures = {}
-        self._overplot = {}
-        self._header = None  # the current header, used by export functions
-
+    Parameters
+    ----------
+    header : Header
+    db : Broker
+        This argument will be removed once Headers hold a ref to their Brokers.
+    """
+    def __init__(self, header, db):
+        self.widget = QWidget()
+        self._header = header
+        self._db = db
         export_csv_btn = QPushButton('CSV')
         export_csv_btn.clicked.connect(self._export_csv)
         export_xlsx_btn = QPushButton('Excel')
         export_xlsx_btn.clicked.connect(self._export_xlsx)
-        self._export_btns = [export_csv_btn, export_xlsx_btn]
-        # Disable buttons until first data set is loaded.
-        [btn.setEnabled(False) for btn in self._export_btns]
 
-        tree_container = QVBoxLayout()
-        export_container = QHBoxLayout()
-        export_container.addWidget(export_csv_btn)
-        export_container.addWidget(export_xlsx_btn)
         layout = QHBoxLayout()
-        tree_container.addWidget(QLabel("View Header (metadata):"))
-        tree_container.addWidget(self._tree)
-        tree_container.addWidget(QLabel("Export Events (data):"))
-        tree_container.addLayout(export_container)
-        layout.addLayout(tree_container)
-        layout.addWidget(self._tabs)
-        self._widget.setLayout(layout)
+        layout.addWidget(export_csv_btn)
+        layout.addWidget(export_xlsx_btn)
+        self.widget.setLayout(layout)
 
     @pyqtSlot()
     def _export_csv(self):
-        if self._header is None:
-            # no data loaded yet
+        fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export CSV')
+        if not fp:
             return
-        fp, _ = QFileDialog.getSaveFileName(self._widget, 'Export CSV')
-        self.db.get_table(self._header).to_csv(fp)
+        self._db.get_table(self._header).to_csv(fp)
 
     @pyqtSlot()
     def _export_xlsx(self):
-        if self._header is None:
-            # no data loaded yet
-            return
         try:
             import openpyxl
         except ImportError:
@@ -136,8 +120,34 @@ class HeaderViewerWidget:
             msg.setWindowTitle("Error")
             msg.exec_()
         else:
-            fp, _ = QFileDialog.getSaveFileName(self._widget, 'Export XLSX')
-            self.db.get_table(self._header).to_xlsx(fp)
+            fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export XLSX')
+            if not fp:
+                return
+            self._db.get_table(self._header).to_xlsx(fp)
+
+
+class HeaderViewerWidget:
+    def __init__(self, dispatcher):
+        self.dispatcher = dispatcher
+        self._tabs = QTabWidget()
+        self.widget = QWidget()
+        self._tree = QTreeWidget()
+        self._tree.setAlternatingRowColors(True)
+        self._figures = {}
+        self._overplot = {}
+
+
+        tree_container = QVBoxLayout()
+        layout = QHBoxLayout()
+        tree_container.addWidget(QLabel("View Header (metadata):"))
+        tree_container.addWidget(self._tree)
+        tree_container.addWidget(QLabel("Export Events (data):"))
+        self.export_widget = Placeholder()  # placeholder
+        tree_container.addWidget(self.export_widget.widget)
+        layout.addLayout(tree_container)
+        layout.addWidget(self._tabs)
+        self.widget.setLayout(layout)
+        self.tree_container = tree_container
 
     def _figure(self, name):
         "matching plt.figure API"
@@ -148,11 +158,23 @@ class HeaderViewerWidget:
             fig.clf()
         return fig
 
-    def __call__(self, header):
-        [btn.setEnabled(True) for btn in self._export_btns]
-        self._header = header
+    def __call__(self, header, db=None):
+        """
+        header : Header
+        db : Broker
+            This will be removed once Headers hold a ref to their Brokers.
+        """
         self.dispatcher(header, self._figure)
         fill_widget(self._tree, header)
+
+        # Remove and destroy the old export widget. Create and add a new one.
+        self.tree_container.removeWidget(self.export_widget.widget)
+        self.export_widget.widget.deleteLater()
+        if db is not None:
+            self.export_widget = TableExportWidget(header, db)
+            self.tree_container.addWidget(self.export_widget.widget)
+        else:
+            self.export_widget = Placholder()
 
     def _add_figure(self, name):
         tab = QWidget()
@@ -195,15 +217,14 @@ class HeaderViewerWindow(HeaderViewerWidget):
     def __init__(self, dispatcher):
         super().__init__(dispatcher)
         self._window = QMainWindow()
-        self._window.setCentralWidget(self._widget)
+        self._window.setCentralWidget(self.widget)
         self._window.show()
-
 
 
 class BrowserWidget:
     def __init__(self, db, dispatcher, item_template):
         self.db = db
-        self._hvw = HeaderViewerWidget(dispatcher, db)
+        self._hvw = HeaderViewerWidget(dispatcher)
         self.dispatcher = dispatcher
         self.item_template = item_template
         self._results = QListWidget()
@@ -211,15 +232,15 @@ class BrowserWidget:
             self._on_results_selection_changed)
         self._search_bar = QLineEdit()
         self._search_bar.textChanged.connect(self._on_search_text_changed)
-        self._widget = QWidget()
+        self.widget = QWidget()
         
         layout = QVBoxLayout()
         sublayout = QHBoxLayout()
         layout.addWidget(self._search_bar)
         layout.addLayout(sublayout)
         sublayout.addWidget(self._results)
-        sublayout.addWidget(self._hvw._widget)
-        self._widget.setLayout(layout)
+        sublayout.addWidget(self._hvw.widget)
+        self.widget.setLayout(layout)
 
     @property
     def dispatcher(self):
@@ -246,8 +267,7 @@ class BrowserWidget:
         row_index = self._results.currentRow()
         if row_index == -1:  # This means None. Do not update the viewer.
             return
-        header = self._headers[row_index]
-        self._hvw(header)
+        self._hvw(self._headers[row_index], self.db)
 
     def search(self, **query):
         self._results.clear()
@@ -278,7 +298,7 @@ class BrowserWindow(BrowserWidget):
     def __init__(self, db, dispatcher, item_template):
         super().__init__(db, dispatcher, item_template)
         self._window = QMainWindow()
-        self._window.setCentralWidget(self._widget)
+        self._window.setCentralWidget(self.widget)
         self._window.show()
 
 
