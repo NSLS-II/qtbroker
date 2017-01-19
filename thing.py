@@ -1,9 +1,7 @@
 from collections import Iterable, OrderedDict
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
-                             QWidget, QHBoxLayout)
-
-# import matplotlib
-# matplotlib.use("Qt4Agg")
+                             QWidget, QHBoxLayout, QVBoxLayout, QLineEdit)
+from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.backends.backend_qt5agg import (
@@ -77,23 +75,45 @@ def view_header(header):
     return widget
 
 
-def view(header):
-    window = QMainWindow()
-    mw = QWidget()
+def view(db, dispatcher):
+    """
+    Parameters
+    ----------
+    db : Broker
+    dispatcher : callable
+        expected signature: ``f(header, fig)``
+
+    Example
+    -------
+    >>> def f(header, fig):
+    ...     db.process(header,
+    ...                LivePlot(header['start']['detectors'][0], fig=fig))
+    ...
+    >>> view(db, f)
+    """
     fig = Figure((5.0, 4.0), dpi=100)
     canvas = FigureCanvas(fig)
-    ax = fig.gca()
-    ax.plot([1,2,3])
+
+    header = db[-1]
+    dispatcher(header, fig)
 
     tree = QTreeWidget()
     tree.setAlternatingRowColors(True)
     fill_widget(tree, header)
 
+    search_bar = QLineEdit()
+
     layout = QHBoxLayout()
     layout.addWidget(tree)
     layout.addWidget(canvas)
-    mw.setLayout(layout)
 
+    layout2 = QVBoxLayout()
+    layout2.addWidget(search_bar)
+    layout2.addLayout(layout)
+
+    mw = QWidget()
+    mw.setLayout(layout2)
+    window = QMainWindow()
     window.setCentralWidget(mw)
 
     window.show()
