@@ -1,7 +1,8 @@
 from collections import Iterable, OrderedDict
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
-                             QListWidget, QListWidgetItem, QTabWidget)
+                             QListWidget, QListWidgetItem, QTabWidget,
+                             QCheckBox)
 from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
@@ -84,6 +85,7 @@ class HeaderViewerWidget:
         self._tree = QTreeWidget()
         self._tree.setAlternatingRowColors(True)
         self._figures = {}
+        self._overplot = {}
 
         layout = QHBoxLayout()
         layout.addWidget(self._tree)
@@ -94,7 +96,10 @@ class HeaderViewerWidget:
         "matching plt.figure API"
         if name not in self._figures:
             self._figures[name] = self._add_figure(name)
-        return self._figures[name]
+        fig = self._figures[name]
+        if not self._overplot[name].isChecked():
+            fig.clf()
+        return fig
 
     def __call__(self, header):
         self.dispatcher(header, self._figure)
@@ -102,12 +107,16 @@ class HeaderViewerWidget:
 
     def _add_figure(self, name):
         tab = QWidget()
+        overplot = QCheckBox("Allow overplotting")
+        overplot.setChecked(False)
+        self._overplot[name] = overplot
         fig = Figure((5.0, 4.0), dpi=100)
         canvas = FigureCanvas(fig)
         canvas.setParent(tab)
         toolbar = NavigationToolbar(canvas, tab)
 
         layout = QVBoxLayout()
+        layout.addWidget(overplot)
         layout.addWidget(canvas)
         layout.addWidget(toolbar)
         tab.setLayout(layout)
