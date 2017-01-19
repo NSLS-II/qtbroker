@@ -1,6 +1,7 @@
 from collections import Iterable, OrderedDict
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
-                             QWidget, QHBoxLayout, QVBoxLayout, QLineEdit)
+                             QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
+                             QListWidget, QListWidgetItem)
 from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
@@ -120,17 +121,34 @@ class HeaderViewerWindow(HeaderViewerWidget):
 
 
 class BrowserWidget:
-    def __init__(self, db, dispatcher):
+    def __init__(self, db, dispatcher, item_template):
         self.db = db
         self._hvw = HeaderViewerWidget(dispatcher)
+        self.dispatcher = dispatcher
+        self.item_template = item_template
+        self._results = QListWidget()
+        self._results.currentItemChanged.connect(
+            self._on_results_selection_changed)
         self._search_bar = QLineEdit()
         self._search_bar.textChanged.connect(self._on_search_text_changed)
         self._widget = QWidget()
         
         layout = QVBoxLayout()
+        sublayout = QHBoxLayout()
         layout.addWidget(self._search_bar)
-        layout.addWidget(self._hvw._widget)
+        layout.addLayout(sublayout)
+        sublayout.addWidget(self._results)
+        sublayout.addWidget(self._hvw._widget)
         self._widget.setLayout(layout)
+
+    @property
+    def dispatcher(self):
+        return self._dispatcher
+
+    @dispatcher.setter
+    def dispatcher(self, val):
+        self._dispatcher = val
+        self._hvw.dispatcher = val
 
     @pyqtSlot()
     def _on_search_text_changed(self):
@@ -141,8 +159,21 @@ class BrowserWidget:
             self._search_bar.setStyleSheet(BAD_TEXT_INPUT)
         else:
             self._search_bar.setStyleSheet(GOOD_TEXT_INPUT)
-            self._headers = self.db(**query)
-            print(len(self._headers))
+            self.search(**query)
+
+    @pyqtSlot()
+    def _on_results_selection_changed(self):
+        row_index = self._results.currentRow()
+        header = self._headers[row_index]
+        self._hvw(header)
+
+    def search(self, **query):
+        self._results.clear()
+        self._headers = self.db(**query)
+        for h in self._headers:
+            item = QListWidgetItem(self.item_template.format(**h))
+            self._results.addItem(item)
+
 
 class BrowserWindow(BrowserWidget):
     """
@@ -160,8 +191,8 @@ class BrowserWindow(BrowserWidget):
     ...
     >>> browser = BrokerWindow(db, f)  # spawns Qt window for searching/viewing
     """
-    def __init__(self, db, dispatcher):
-        super().__init__(db, dispatcher)
+    def __init__(self, db, dispatcher, item_template):
+        super().__init__(db, dispatcher, item_template)
         self._window = QMainWindow()
         self._window.setCentralWidget(self._widget)
         self._window.show()
