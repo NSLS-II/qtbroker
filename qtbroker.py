@@ -75,7 +75,27 @@ def view_header(header):
     return widget
 
 
-def view(db, dispatcher):
+class HeaderViewerWidget:
+    def __init__(self, dispatcher):
+        self.dispatcher = dispatcher
+        self._fig = Figure((5.0, 4.0), dpi=100)
+        self._widget = QWidget()
+        self._tree = QTreeWidget()
+        self._tree.setAlternatingRowColors(True)
+
+        canvas = FigureCanvas(self._fig)
+
+        layout = QHBoxLayout()
+        layout.addWidget(self._tree)
+        layout.addWidget(canvas)
+        self._widget.setLayout(layout)
+
+    def __call__(self, header):
+        self.dispatcher(header, self._fig)
+        fill_widget(self._tree, header)
+
+
+class HeaderViewerWindow(HeaderViewerWidget):
     """
     Parameters
     ----------
@@ -89,32 +109,59 @@ def view(db, dispatcher):
     ...     db.process(header,
     ...                LivePlot(header['start']['detectors'][0], fig=fig))
     ...
-    >>> view(db, f)
+    >>> h = db[-1]
+    >>> view = HeaderViewerWindow(f)
+    >>> view(h)
     """
-    fig = Figure((5.0, 4.0), dpi=100)
-    canvas = FigureCanvas(fig)
+    def __init__(self, dispatcher):
+        super().__init__(dispatcher)
+        self._window = QMainWindow()
+        self._window.setCentralWidget(self._widget)
+        self._window.show()
 
-    header = db[-1]
-    dispatcher(header, fig)
 
-    tree = QTreeWidget()
-    tree.setAlternatingRowColors(True)
-    fill_widget(tree, header)
+class BrowserWidget:
+    def __init__(self, db, dispatcher):
+        self.db = db
+        self._hvw = HeaderViewerWidget(dispatcher)
+        self._search_bar = QLineEdit()
+        self._search_bar.textChanged.connect(self._on_search_text_changed)
+        self._widget = QWidget()
+        
+        layout = QVBoxLayout()
+        layout.addWidget(self._search_bar)
+        layout.addWidget(self._hvw._widget)
+        self._widget.setLayout(layout)
 
-    search_bar = QLineEdit()
+    @pyqtSlot()
+    def _on_search_text_changed(self):
+        text = self._search_bar.text()
+        try:
+            query = eval("dict({})".format(text))
+        except Exception:
+            self._search_bar.setStyleSheet(BAD_TEXT_INPUT)
+        else:
+            self._search_bar.setStyleSheet(GOOD_TEXT_INPUT)
+            self._headers = self.db(**query)
+            print(len(self._headers))
 
-    layout = QHBoxLayout()
-    layout.addWidget(tree)
-    layout.addWidget(canvas)
+class BrowserWindow(BrowserWidget):
+    def __init__(self, db, dispatcher):
+        super().__init__(db, dispatcher)
+        self._window = QMainWindow()
+        self._window.setCentralWidget(self._widget)
+        self._window.show()
 
-    layout2 = QVBoxLayout()
-    layout2.addWidget(search_bar)
-    layout2.addLayout(layout)
 
-    mw = QWidget()
-    mw.setLayout(layout2)
-    window = QMainWindow()
-    window.setCentralWidget(mw)
+BAD_TEXT_INPUT = """
+QLineEdit {
+    background-color: rgb(255, 100, 100);
+}
+"""
 
-    window.show()
-    return window
+
+GOOD_TEXT_INPUT = """
+QLineEdit {
+    background-color: rgb(255, 255, 255);
+}
+"""
