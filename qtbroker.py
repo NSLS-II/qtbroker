@@ -1,7 +1,7 @@
 from collections import Iterable, OrderedDict
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
-                             QListWidget, QListWidgetItem)
+                             QListWidget, QListWidgetItem, QTabWidget)
 from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
@@ -79,21 +79,40 @@ def view_header(header):
 class HeaderViewerWidget:
     def __init__(self, dispatcher):
         self.dispatcher = dispatcher
-        self._fig = Figure((5.0, 4.0), dpi=100)
+        self._tabs = QTabWidget()
         self._widget = QWidget()
         self._tree = QTreeWidget()
         self._tree.setAlternatingRowColors(True)
-
-        canvas = FigureCanvas(self._fig)
+        self._figures = {}
 
         layout = QHBoxLayout()
         layout.addWidget(self._tree)
-        layout.addWidget(canvas)
+        layout.addWidget(self._tabs)
         self._widget.setLayout(layout)
 
+    def _figure(self, name):
+        "matching plt.figure API"
+        if name not in self._figures:
+            self._figures[name] = self._add_figure(name)
+        return self._figures[name]
+
     def __call__(self, header):
-        self.dispatcher(header, self._fig)
+        self.dispatcher(header, self._figure)
         fill_widget(self._tree, header)
+
+    def _add_figure(self, name):
+        tab = QWidget()
+        fig = Figure((5.0, 4.0), dpi=100)
+        canvas = FigureCanvas(fig)
+        canvas.setParent(tab)
+        toolbar = NavigationToolbar(canvas, tab)
+
+        layout = QVBoxLayout()
+        layout.addWidget(canvas)
+        layout.addWidget(toolbar)
+        tab.setLayout(layout)
+        self._tabs.addTab(tab, name)
+        return fig
 
 
 class HeaderViewerWindow(HeaderViewerWidget):
@@ -105,9 +124,11 @@ class HeaderViewerWindow(HeaderViewerWidget):
 
     Example
     -------
-    >>> def f(header, fig):
+    >>> def f(header, factory):
+    ...     fig = factory(header['start']['plan_name'])
+    ...     ax = fig.gca()
     ...     db.process(header,
-    ...                LivePlot(header['start']['detectors'][0], fig=fig))
+    ...                LivePlot(header['start']['detectors'][0], ax=ax))
     ...
     >>> h = db[-1]
     >>> view = HeaderViewerWindow(f)
@@ -118,6 +139,7 @@ class HeaderViewerWindow(HeaderViewerWidget):
         self._window = QMainWindow()
         self._window.setCentralWidget(self._widget)
         self._window.show()
+
 
 
 class BrowserWidget:
@@ -185,9 +207,11 @@ class BrowserWindow(BrowserWidget):
 
     Example
     -------
-    >>> def f(header, fig):
+    >>> def f(header, factory):
+    ...     fig = factory(header['start']['plan_name'])
+    ...     ax = fig.gca()
     ...     db.process(header,
-    ...                LivePlot(header['start']['detectors'][0], fig=fig))
+    ...                LivePlot(header['start']['detectors'][0], ax=ax))
     ...
     >>> browser = BrokerWindow(db, f)  # spawns Qt window for searching/viewing
     """
