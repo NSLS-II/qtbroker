@@ -99,7 +99,6 @@ class HeaderViewerWindow(HeaderViewerWidget):
     """
     Parameters
     ----------
-    db : Broker
     dispatcher : callable
         expected signature: ``f(header, fig)``
 
@@ -111,7 +110,7 @@ class HeaderViewerWindow(HeaderViewerWidget):
     ...
     >>> h = db[-1]
     >>> view = HeaderViewerWindow(f)
-    >>> view(h)
+    >>> view(h)  # spawns Qt window for viewing h
     """
     def __init__(self, dispatcher):
         super().__init__(dispatcher)
@@ -146,6 +145,21 @@ class BrowserWidget:
             print(len(self._headers))
 
 class BrowserWindow(BrowserWidget):
+    """
+    Parameters
+    ----------
+    db : Broker
+    dispatcher : callable
+        expected signature: ``f(header, fig)``
+
+    Example
+    -------
+    >>> def f(header, fig):
+    ...     db.process(header,
+    ...                LivePlot(header['start']['detectors'][0], fig=fig))
+    ...
+    >>> browser = BrokerWindow(db, f)  # spawns Qt window for searching/viewing
+    """
     def __init__(self, db, dispatcher):
         super().__init__(db, dispatcher)
         self._window = QMainWindow()
