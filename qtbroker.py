@@ -133,7 +133,7 @@ class HeaderViewerWidget:
         self.widget = QWidget()
         self._tree = QTreeWidget()
         self._tree.setAlternatingRowColors(True)
-        self._figures = {}
+        self._figures = OrderedDict()
         self._overplot = {}
 
 
@@ -151,11 +151,15 @@ class HeaderViewerWidget:
 
     def _figure(self, name):
         "matching plt.figure API"
+        # Find a figure with the desired name; if none, create one.
         if name not in self._figures:
             self._figures[name] = self._add_figure(name)
         fig = self._figures[name]
+        # If overplotting is not allowed, clear the figure.
         if not self._overplot[name].isChecked():
             fig.clf()
+        # Bring the appropriate tab into focus.
+        self._tabs.setCurrentIndex(list(self._figures).index(name))
         return fig
 
     def __call__(self, header, db=None):
