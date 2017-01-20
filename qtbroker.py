@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
                              QListWidget, QListWidgetItem, QTabWidget,
                              QCheckBox, QPushButton, QLabel, QFileDialog,
-                             QMessageBox)
+                             QMessageBox, QApplication)
 from PyQt5.QtCore import pyqtSlot
 from matplotlib.figure import Figure
 from matplotlib.backend_bases import key_press_handler
@@ -11,6 +11,10 @@ from matplotlib.backends.backend_qt5agg import (
     FigureCanvasQTAgg as FigureCanvas,
     NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.backends import qt_compat
+from PyQt5.QtCore import QMimeData
+
+
+CLIPBOARD = QApplication.clipboard()
 
 
 class Placeholder:
@@ -93,11 +97,19 @@ class TableExportWidget:
         export_csv_btn.clicked.connect(self._export_csv)
         export_xlsx_btn = QPushButton('Excel')
         export_xlsx_btn.clicked.connect(self._export_xlsx)
+        copy_uid_btn  = QPushButton('Copy UID to Clipbaord')
+        copy_uid_btn.clicked.connect(
+            lambda: self._copy_uid(self._header['start']['uid']))
 
         layout = QHBoxLayout()
         layout.addWidget(export_csv_btn)
         layout.addWidget(export_xlsx_btn)
+        layout.addWidget(copy_uid_btn)
         self.widget.setLayout(layout)
+
+    @pyqtSlot()
+    def _copy_uid(self, uid):
+        CLIPBOARD.setText(uid)
 
     @pyqtSlot()
     def _export_csv(self):
