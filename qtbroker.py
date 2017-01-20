@@ -187,6 +187,7 @@ class HeaderViewerWidget:
         self._overplot[name] = overplot
         fig = Figure((5.0, 4.0), dpi=100)
         canvas = FigureCanvas(fig)
+        canvas.setMinimumWidth(640)
         canvas.setParent(tab)
         toolbar = NavigationToolbar(canvas, tab)
 
