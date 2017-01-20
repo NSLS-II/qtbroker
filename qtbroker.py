@@ -1,4 +1,5 @@
 from collections import Iterable, OrderedDict
+from datetime import datetime
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
                              QListWidget, QListWidgetItem, QTabWidget,
@@ -33,7 +34,7 @@ def fill_item(item, value):
         for key, val in sorted(value.items()):
             child = QTreeWidgetItem()
             # val is dict or a list -> recurse
-            if (hasattr(val, 'items') or _listlike(val)):
+            if hasattr(val, 'items') or _listlike(val):
                 child.setText(0, _short_repr(key).strip("'"))
                 item.addChild(child)
                 fill_item(child, val)
@@ -41,8 +42,15 @@ def fill_item(item, value):
                     child.setExpanded(False)
             # val is not iterable -> show key and val on one line
             else:
-                text = "{}: {}".format(_short_repr(key).strip("'"),
-                                       _short_repr(val))
+                # Show human-readable datetime alongside raw timestamp.
+                # 1484948553.567529 > '[2017-01-20 16:42:33] 1484948553.567529'
+                if (key == 'time') and isinstance(val, float):
+                    FMT = '%Y-%m-%d %H:%M:%S'
+                    ts = datetime.fromtimestamp(val).strftime(FMT)
+                    text = "time: [{}] {}".format(ts, val)
+                else:
+                    text = "{}: {}".format(_short_repr(key).strip("'"),
+                                        _short_repr(val))
                 child.setText(0, text)
                 item.addChild(child)
 
