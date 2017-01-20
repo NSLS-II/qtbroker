@@ -65,7 +65,7 @@ def _listlike(val):
 
 def _short_repr(text):
     r = repr(text)
-    if len(r) > 30:
+    if len(r) > 82:
         r = r[:27] + '...'
     return r
 
