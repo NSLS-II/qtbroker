@@ -6,6 +6,7 @@ from matplotlib.widgets import Cursor
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import NullLocator, LinearLocator
 from matplotlib.colors import Normalize
+from matplotlib.widgets import Slider
 import numpy as np
 
 
@@ -445,7 +446,6 @@ class CrossSection(object):
     def autoscale_vertical(self, enable):
         self._ax_v.autoscale(enable=False)
 
-from matplotlib.widgets import Slider
 
 class StackViewer(object):
     """
@@ -459,14 +459,16 @@ class StackViewer(object):
     def __init__(self, viewer, images):
         self.viewer = viewer
         self.images = images
+        length = len(self.images)
         fig = self.viewer._fig
         slider_ax = fig.add_axes([0.1, 0.01, 0.8, 0.02])
-        self.slider = Slider(slider_ax, 'Frame', 0, len(self.images), 0,
-                             valfmt='%d')
+        self.slider = Slider(slider_ax, 'Frame', 0, length - 1, 0,
+                             valfmt='%d/{}'.format(length - 1))
         self.slider.on_changed(self.update)
+        self.update(0)  # Trigger the initialization of viewer.
 
     def update(self, val):
         if not isinstance(val, int):
-            self.slider.set_val(int(val))
+            self.slider.set_val(int(round(val)))
             # sends up through 'update' again
         self.viewer.update_image(self.images[int(val)])
