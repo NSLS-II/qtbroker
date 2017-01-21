@@ -385,7 +385,6 @@ class CrossSection(object):
         if self._imdata is None or self._imdata.shape != image.shape:
             self._init_artists(image)
         self._imdata = image
-        self._move_cb(None)
         self._dirty = True
 
     @auto_redraw
