@@ -381,6 +381,7 @@ class CrossSection(object):
         The input data does not necessarily have to be the same shape as the
         original image
         """
+        image = np.asarray(image)
         if self._imdata is None or self._imdata.shape != image.shape:
             self._init_artists(image)
         self._imdata = image
