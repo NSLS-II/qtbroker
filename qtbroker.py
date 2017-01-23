@@ -1,4 +1,5 @@
 from collections import Iterable, OrderedDict
+import os
 from datetime import datetime
 from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
                              QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
@@ -124,7 +125,14 @@ class TableExportWidget:
         fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export CSV')
         if not fp:
             return
-        self._db.get_table(self._header).to_csv(fp)
+        # Create a separate CSV for each event stream, named like
+        # 'mydata-primary.xlsx', 'mydata-baseline.xlsx', ....
+        base, ext = os.path.splitext(fp)
+        tables = {d['name']: self._db.get_table(self._header,
+                                                stream_name=d['name'])
+                  for d in self._header.descriptors}
+        for name, df in tables.items():
+            df.to_csv('{}-{}{}'.format(base, name, ext))
 
     @pyqtSlot()
     def _export_xlsx(self):
@@ -140,10 +148,19 @@ class TableExportWidget:
             msg.setWindowTitle("Error")
             msg.exec_()
         else:
+            from pandas import ExcelWriter
             fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export XLSX')
             if not fp:
                 return
-            self._db.get_table(self._header).to_xlsx(fp)
+            # Write each event stream to a different spreadsheet in one
+            # Excel document.
+            writer = ExcelWriter(fp)
+            tables = {d['name']: self._db.get_table(self._header,
+                                                    stream_name=d['name'])
+                      for d in self._header.descriptors}
+            for name, df in tables.items():
+                df.to_excel(writer, name)
+            writer.save()
 
 
 class HeaderViewerWidget:
