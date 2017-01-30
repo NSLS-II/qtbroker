@@ -360,14 +360,14 @@ class BrowserWindow(BrowserWidget):
 
 
 BAD_TEXT_INPUT = """
-QtWidgets.QLineEdit {
+QLineEdit {
     background-color: rgb(255, 100, 100);
 }
 """
 
 
 GOOD_TEXT_INPUT = """
-QtWidgets.QLineEdit {
+QLineEdit {
     background-color: rgb(255, 255, 255);
 }
 """
