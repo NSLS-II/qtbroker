@@ -1,39 +1,29 @@
 from collections import Iterable, OrderedDict
 import os
 from datetime import datetime
-from PyQt5.QtWidgets import (QTreeWidgetItem, QMainWindow, QTreeWidget,
-                             QWidget, QHBoxLayout, QVBoxLayout, QLineEdit,
-                             QListWidget, QListWidgetItem, QTabWidget,
-                             QCheckBox, QPushButton, QLabel, QFileDialog,
-                             QMessageBox, QApplication)
-from PyQt5.QtCore import pyqtSlot
+import matplotlib
+from matplotlib.backends.qt_compat import QtWidgets, QtCore
 from matplotlib.figure import Figure
-from matplotlib.backend_bases import key_press_handler
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg as FigureCanvas,
-    NavigationToolbar2QT as NavigationToolbar)
-from matplotlib.backends import qt_compat
-from PyQt5.QtCore import QMimeData
 
 
-CLIPBOARD = QApplication.clipboard()
+CLIPBOARD = QtWidgets.QApplication.clipboard()
 
 
 class Placeholder:
     def __init__(self):
-        self.widget = QWidget()
+        self.widget = QtWidgets.QWidget()
 
 
 def fill_item(item, value):
     """
-    Display a dictionary as a QtTreeWidget
+    Display a dictionary as a QtWidgets.QtTreeWidget
 
     adapted from http://stackoverflow.com/a/21806048/1221924
     """
     item.setExpanded(True)
     if hasattr(value, 'items'):
         for key, val in sorted(value.items()):
-            child = QTreeWidgetItem()
+            child = QtWidgets.QTreeWidgetItem()
             # val is dict or a list -> recurse
             if hasattr(val, 'items') or _listlike(val):
                 child.setText(0, _short_repr(key).strip("'"))
@@ -62,12 +52,12 @@ def fill_item(item, value):
             elif _listlike(val):
                 fill_item(item, val)
             else:
-                child = QTreeWidgetItem()
+                child = QtWidgets.QTreeWidgetItem()
                 item.addChild(child)
                 child.setExpanded(True)
                 child.setText(0, _short_repr(val))
     else:
-        child = QTreeWidgetItem()
+        child = QtWidgets.QTreeWidgetItem()
         child.setText(0, _short_repr(value))
         item.addChild(child)
 
@@ -99,30 +89,30 @@ class TableExportWidget:
         This argument will be removed once Headers hold a ref to their Brokers.
     """
     def __init__(self, header, db):
-        self.widget = QWidget()
+        self.widget = QtWidgets.QWidget()
         self._header = header
         self._db = db
-        export_csv_btn = QPushButton('CSV')
+        export_csv_btn = QtWidgets.QPushButton('CSV')
         export_csv_btn.clicked.connect(self._export_csv)
-        export_xlsx_btn = QPushButton('Excel')
+        export_xlsx_btn = QtWidgets.QPushButton('Excel')
         export_xlsx_btn.clicked.connect(self._export_xlsx)
-        copy_uid_btn  = QPushButton('Copy UID to Clipbaord')
+        copy_uid_btn  = QtWidgets.QPushButton('Copy UID to Clipbaord')
         copy_uid_btn.clicked.connect(
             lambda: self._copy_uid(self._header['start']['uid']))
 
-        layout = QHBoxLayout()
+        layout = QtWidgets.QHBoxLayout()
         layout.addWidget(export_csv_btn)
         layout.addWidget(export_xlsx_btn)
         layout.addWidget(copy_uid_btn)
         self.widget.setLayout(layout)
 
-    @pyqtSlot()
+    @QtCore.pyqtSlot()
     def _copy_uid(self, uid):
         CLIPBOARD.setText(uid)
 
-    @pyqtSlot()
+    @QtCore.pyqtSlot()
     def _export_csv(self):
-        fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export CSV')
+        fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget, 'Export CSV')
         if not fp:
             return
         # Create a separate CSV for each event stream, named like
@@ -134,13 +124,13 @@ class TableExportWidget:
         for name, df in tables.items():
             df.to_csv('{}-{}{}'.format(base, name, ext))
 
-    @pyqtSlot()
+    @QtCore.pyqtSlot()
     def _export_xlsx(self):
         try:
             import openpyxl
         except ImportError:
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
+            msg = QtWidgets.QMessageBox()
+            msg.setIcon(QtWidgets.QMessageBox.Critical)
             msg.setText("Feature Not Available")
             msg.setInformativeText("The Python package openpyxl must be "
                                    "installed to enable Excel export. Use "
@@ -149,7 +139,7 @@ class TableExportWidget:
             msg.exec_()
         else:
             from pandas import ExcelWriter
-            fp, _ = QFileDialog.getSaveFileName(self.widget, 'Export XLSX')
+            fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget, 'Export XLSX')
             if not fp:
                 return
             # Write each event stream to a different spreadsheet in one
@@ -159,32 +149,47 @@ class TableExportWidget:
                                                     stream_name=d['name'])
                       for d in self._header.descriptors}
             for name, df in tables.items():
-                df.to_excel(writer, name)
+                df.to_excel(writmer, name)
             writer.save()
 
 
 class HeaderViewerWidget:
     def __init__(self, dispatcher):
         self.dispatcher = dispatcher
-        self._tabs = QTabWidget()
-        self.widget = QWidget()
-        self._tree = QTreeWidget()
+        self._tabs = QtWidgets.QTabWidget()
+        self.widget = QtWidgets.QWidget()
+        self._tree = QtWidgets.QTreeWidget()
         self._tree.setAlternatingRowColors(True)
         self._figures = OrderedDict()
         self._overplot = {}
 
-
-        tree_container = QVBoxLayout()
-        layout = QHBoxLayout()
-        tree_container.addWidget(QLabel("View Header (metadata):"))
+        tree_container = QtWidgets.QVBoxLayout()
+        layout = QtWidgets.QHBoxLayout()
+        tree_container.addWidget(QtWidgets.QLabel("View Header (metadata):"))
         tree_container.addWidget(self._tree)
-        tree_container.addWidget(QLabel("Export Events (data):"))
+        tree_container.addWidget(QtWidgets.QLabel("Export Events (data):"))
         self.export_widget = Placeholder()  # placeholder
         tree_container.addWidget(self.export_widget.widget)
         layout.addLayout(tree_container)
         layout.addWidget(self._tabs)
         self.widget.setLayout(layout)
         self.tree_container = tree_container
+
+        backend = matplotlib.get_backend()
+        if backend == 'Qt5Agg':
+            from matplotlib.backends.backend_qt5agg import (
+                FigureCanvasQTAgg as FigureCanvas,
+                NavigationToolbar2QT as NavigationToolbar)
+        elif backend == 'Qt4Agg':
+            from matplotlib.backends.backend_qt4agg import (
+                FigureCanvasQTAgg as FigureCanvas,
+                NavigationToolbar2QT as NavigationToolbar)
+        else:
+            raise Exception("matplotlib backend is {!r} but it expected to be one of "
+                            "('Qt4Agg', 'Qt5Agg')".format(backend))
+        # Stash them on the instance to avoid needing to re-import.
+        self.FigureCanvas = FigureCanvas
+        self.NavigationToolbar = NavigationToolbar
 
     def _figure(self, name):
         "matching plt.figure API"
@@ -218,19 +223,19 @@ class HeaderViewerWidget:
             self.export_widget = Placholder()
 
     def _add_figure(self, name):
-        tab = QWidget()
-        overplot = QCheckBox("Allow overplotting")
+        tab = QtWidgets.QWidget()
+        overplot = QtWidgets.QCheckBox("Allow overplotting")
         overplot.setChecked(False)
         self._overplot[name] = overplot
         fig = Figure((5.0, 4.0), dpi=100)
-        canvas = FigureCanvas(fig)
+        canvas = self.FigureCanvas(fig)
         canvas.setMinimumWidth(640)
         canvas.setParent(tab)
-        toolbar = NavigationToolbar(canvas, tab)
+        toolbar = self.NavigationToolbar(canvas, tab)
 
-        layout = QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(overplot)
-        layout.addWidget(QLabel(name))
+        layout.addWidget(QtWidgets.QLabel(name))
         layout.addWidget(canvas)
         layout.addWidget(toolbar)
         tab.setLayout(layout)
@@ -255,11 +260,11 @@ class HeaderViewerWindow(HeaderViewerWidget):
     ...
     >>> h = db[-1]
     >>> view = HeaderViewerWindow(f)
-    >>> view(h)  # spawns Qt window for viewing h
+    >>> view(h)  # spawns QtWidgets.Qt window for viewing h
     """
     def __init__(self, dispatcher):
         super().__init__(dispatcher)
-        self._window = QMainWindow()
+        self._window = QtWidgets.QMainWindow()
         self._window.setCentralWidget(self.widget)
         self._window.show()
 
@@ -270,15 +275,15 @@ class BrowserWidget:
         self._hvw = HeaderViewerWidget(dispatcher)
         self.dispatcher = dispatcher
         self.item_template = item_template
-        self._results = QListWidget()
+        self._results = QtWidgets.QListWidget()
         self._results.currentItemChanged.connect(
             self._on_results_selection_changed)
-        self._search_bar = QLineEdit()
+        self._search_bar = QtWidgets.QLineEdit()
         self._search_bar.textChanged.connect(self._on_search_text_changed)
-        self.widget = QWidget()
+        self.widget = QtWidgets.QWidget()
         
-        layout = QVBoxLayout()
-        sublayout = QHBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
+        sublayout = QtWidgets.QHBoxLayout()
         layout.addWidget(self._search_bar)
         layout.addLayout(sublayout)
         sublayout.addWidget(self._results)
@@ -294,7 +299,7 @@ class BrowserWidget:
         self._dispatcher = val
         self._hvw.dispatcher = val
 
-    @pyqtSlot()
+    @QtCore.pyqtSlot()
     def _on_search_text_changed(self):
         text = self._search_bar.text()
         try:
@@ -305,7 +310,7 @@ class BrowserWidget:
             self._search_bar.setStyleSheet(GOOD_TEXT_INPUT)
             self.search(**query)
 
-    @pyqtSlot()
+    @QtCore.pyqtSlot()
     def _on_results_selection_changed(self):
         row_index = self._results.currentRow()
         if row_index == -1:  # This means None. Do not update the viewer.
@@ -316,7 +321,7 @@ class BrowserWidget:
         self._results.clear()
         self._headers = self.db(**query)
         for h in self._headers:
-            item = QListWidgetItem(self.item_template.format(**h))
+            item = QtWidgets.QListWidgetItem(self.item_template.format(**h))
             self._results.addItem(item)
 
 
@@ -336,24 +341,24 @@ class BrowserWindow(BrowserWidget):
     ...     db.process(header,
     ...                LivePlot(header['start']['detectors'][0], ax=ax))
     ...
-    >>> browser = BrokerWindow(db, f)  # spawns Qt window for searching/viewing
+    >>> browser = BrokerWindow(db, f)  # spawns QtWidgets.Qt window for searching/viewing
     """
     def __init__(self, db, dispatcher, item_template):
         super().__init__(db, dispatcher, item_template)
-        self._window = QMainWindow()
+        self._window = QtWidgets.QMainWindow()
         self._window.setCentralWidget(self.widget)
         self._window.show()
 
 
 BAD_TEXT_INPUT = """
-QLineEdit {
+QtWidgets.QLineEdit {
     background-color: rgb(255, 100, 100);
 }
 """
 
 
 GOOD_TEXT_INPUT = """
-QLineEdit {
+QtWidgets.QLineEdit {
     background-color: rgb(255, 255, 255);
 }
 """
