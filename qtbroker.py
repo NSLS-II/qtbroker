@@ -112,7 +112,8 @@ class TableExportWidget:
 
     @QtCore.pyqtSlot()
     def _export_csv(self):
-        fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget, 'Export CSV')
+        fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget,
+                                                      'Export CSV')
         if not fp:
             return
         # Create a separate CSV for each event stream, named like
@@ -139,7 +140,8 @@ class TableExportWidget:
             msg.exec_()
         else:
             from pandas import ExcelWriter
-            fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget, 'Export XLSX')
+            fp, _ = QtWidgets.QFileDialog.getSaveFileName(self.widget,
+                                                          'Export XLSX')
             if not fp:
                 return
             # Write each event stream to a different spreadsheet in one
@@ -154,10 +156,12 @@ class TableExportWidget:
 
 
 class HeaderViewerWidget:
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
+    def __init__(self, fig_dispatch, text_dispatch):
+        self.fig_dispatch = fig_dispatch
+        self.text_dispatch = text_dispatch
         self._tabs = QtWidgets.QTabWidget()
         self.widget = QtWidgets.QWidget()
+        self._text_summary = QtWidgets.QLabel()
         self._tree = QtWidgets.QTreeWidget()
         self._tree.setAlternatingRowColors(True)
         self._figures = OrderedDict()
@@ -165,6 +169,7 @@ class HeaderViewerWidget:
 
         tree_container = QtWidgets.QVBoxLayout()
         layout = QtWidgets.QHBoxLayout()
+        tree_container.addWidget(self._text_summary)
         tree_container.addWidget(QtWidgets.QLabel("View Header (metadata):"))
         tree_container.addWidget(self._tree)
         tree_container.addWidget(QtWidgets.QLabel("Export Events (data):"))
@@ -185,8 +190,8 @@ class HeaderViewerWidget:
                 FigureCanvasQTAgg as FigureCanvas,
                 NavigationToolbar2QT as NavigationToolbar)
         else:
-            raise Exception("matplotlib backend is {!r} but it expected to be one of "
-                            "('Qt4Agg', 'Qt5Agg')".format(backend))
+            raise Exception("matplotlib backend is {!r} but it expected to be"
+                            "one of ('Qt4Agg', 'Qt5Agg')".format(backend))
         # Stash them on the instance to avoid needing to re-import.
         self.FigureCanvas = FigureCanvas
         self.NavigationToolbar = NavigationToolbar
@@ -210,7 +215,9 @@ class HeaderViewerWidget:
         db : Broker
             This will be removed once Headers hold a ref to their Brokers.
         """
-        self.dispatcher(header, self._figure)
+        self.fig_dispatch(header, self._figure)
+        text = self.text_dispatch(header)
+        self._text_summary.setText(text)
         fill_widget(self._tree, header)
 
         # Remove and destroy the old export widget. Create and add a new one.
@@ -232,10 +239,12 @@ class HeaderViewerWidget:
         canvas.setMinimumWidth(640)
         canvas.setParent(tab)
         toolbar = self.NavigationToolbar(canvas, tab)
+        tab_label = QtWidgets.QLabel(name)
+        tab_label.setMaximumHeight(20)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(overplot)
-        layout.addWidget(QtWidgets.QLabel(name))
+        layout.addWidget(tab_label)
         layout.addWidget(canvas)
         layout.addWidget(toolbar)
         tab.setLayout(layout)
@@ -247,8 +256,10 @@ class HeaderViewerWindow(HeaderViewerWidget):
     """
     Parameters
     ----------
-    dispatcher : callable
-        expected signature: ``f(header, fig)``
+    fig_dispatch : callable
+        expected signature: ``f(header, fig_factory)``
+    text_dispatch : callable
+        expected signature: ``f(header) -> str``
 
     Example
     -------
@@ -262,19 +273,20 @@ class HeaderViewerWindow(HeaderViewerWidget):
     >>> view = HeaderViewerWindow(f)
     >>> view(h)  # spawns QtWidgets.Qt window for viewing h
     """
-    def __init__(self, dispatcher):
-        super().__init__(dispatcher)
+    def __init__(self, fig_dispatch, text_dispatch):
+        super().__init__(fig_dispatch, text_dispatch)
         self._window = QtWidgets.QMainWindow()
         self._window.setCentralWidget(self.widget)
         self._window.show()
 
 
 class BrowserWidget:
-    def __init__(self, db, dispatcher, item_template):
+    def __init__(self, db, fig_dispatch, text_dispatch, short_template):
         self.db = db
-        self._hvw = HeaderViewerWidget(dispatcher)
-        self.dispatcher = dispatcher
-        self.item_template = item_template
+        self._hvw = HeaderViewerWidget(fig_dispatch, text_dispatch)
+        self.fig_dispatch = fig_dispatch
+        self.text_dispatch = text_dispatch
+        self.short_template = short_template
         self._results = QtWidgets.QListWidget()
         self._results.currentItemChanged.connect(
             self._on_results_selection_changed)
@@ -289,15 +301,6 @@ class BrowserWidget:
         sublayout.addWidget(self._results)
         sublayout.addWidget(self._hvw.widget)
         self.widget.setLayout(layout)
-
-    @property
-    def dispatcher(self):
-        return self._dispatcher
-
-    @dispatcher.setter
-    def dispatcher(self, val):
-        self._dispatcher = val
-        self._hvw.dispatcher = val
 
     @QtCore.pyqtSlot()
     def _on_search_text_changed(self):
@@ -321,7 +324,7 @@ class BrowserWidget:
         self._results.clear()
         self._headers = self.db(**query)
         for h in self._headers:
-            item = QtWidgets.QListWidgetItem(self.item_template.format(**h))
+            item = QtWidgets.QListWidgetItem(self.short_template.format(**h))
             self._results.addItem(item)
 
 
@@ -330,8 +333,12 @@ class BrowserWindow(BrowserWidget):
     Parameters
     ----------
     db : Broker
-    dispatcher : callable
-        expected signature: ``f(header, fig)``
+    fig_dispatch : callable
+        expected signature: ``f(header, fig_factory)``
+    text_dispatch : callable
+        expected signature: ``f(header) -> str``
+    short_template : str
+        format string which will be passed ``**header``
 
     Example
     -------
@@ -341,10 +348,12 @@ class BrowserWindow(BrowserWidget):
     ...     db.process(header,
     ...                LivePlot(header['start']['detectors'][0], ax=ax))
     ...
-    >>> browser = BrokerWindow(db, f)  # spawns QtWidgets.Qt window for searching/viewing
+    >>> t = lambda header: header['plan_name']
+    >>> s = '{start[plan_name]}'
+    >>> browser = BrokerWindow(db, f, t, s)
     """
-    def __init__(self, db, dispatcher, item_template):
-        super().__init__(db, dispatcher, item_template)
+    def __init__(self, db, fig_dispatch, text_dispatch, short_template):
+        super().__init__(db, fig_dispatch, text_dispatch, short_template)
         self._window = QtWidgets.QMainWindow()
         self._window.setCentralWidget(self.widget)
         self._window.show()
