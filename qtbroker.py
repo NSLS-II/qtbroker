@@ -230,10 +230,11 @@ class HeaderViewerWidget:
 
         layout = QVBoxLayout()
         layout.addWidget(overplot)
+        layout.addWidget(QLabel(name))
         layout.addWidget(canvas)
         layout.addWidget(toolbar)
         tab.setLayout(layout)
-        self._tabs.addTab(tab, name)
+        self._tabs.addTab(tab, '{:.8}'.format(name))
         return fig
 
 
