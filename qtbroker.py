@@ -10,6 +10,10 @@ CLIPBOARD = QtWidgets.QApplication.clipboard()
 
 
 class Placeholder:
+    """An empty placeholder with the same interface as the classes below
+
+    i.e., a ``widget`` attribute that is a ``QWidget``
+    """
     def __init__(self):
         self.widget = QtWidgets.QWidget()
 
@@ -156,6 +160,16 @@ class TableExportWidget:
 
 
 class HeaderViewerWidget:
+    """
+    Widget containing a tree view of md, a text summary, and tabs of figures.
+
+    Parameters
+    ----------
+    fig_dispatch : callable
+        expected signature: ``f(header, fig_factory)``
+    text_dispatch : callable
+        expected signature: ``f(header) -> str``
+    """
     def __init__(self, fig_dispatch, text_dispatch):
         self.fig_dispatch = fig_dispatch
         self.text_dispatch = text_dispatch
@@ -254,6 +268,8 @@ class HeaderViewerWidget:
 
 class HeaderViewerWindow(HeaderViewerWidget):
     """
+    Window containing a tree view of md, a text summary, and tabs of figures.
+
     Parameters
     ----------
     fig_dispatch : callable
@@ -269,9 +285,10 @@ class HeaderViewerWindow(HeaderViewerWidget):
     ...     db.process(header,
     ...                LivePlot(header['start']['detectors'][0], ax=ax))
     ...
+    >>> t = lambda header: header['plan_name']
+    >>> view = HeaderViewerWindow(f, t)
     >>> h = db[-1]
-    >>> view = HeaderViewerWindow(f)
-    >>> view(h)  # spawns QtWidgets.Qt window for viewing h
+    >>> view(h)  # spawns Qt window for viewing h
     """
     def __init__(self, fig_dispatch, text_dispatch):
         super().__init__(fig_dispatch, text_dispatch)
@@ -281,6 +298,19 @@ class HeaderViewerWindow(HeaderViewerWidget):
 
 
 class BrowserWidget:
+    """
+    Widget containing a search bar and results with a HeaderViewerWidget.
+
+    Parameters
+    ----------
+    db : Broker
+    fig_dispatch : callable
+        expected signature: ``f(header, fig_factory)``
+    text_dispatch : callable
+        expected signature: ``f(header) -> str``
+    short_template : str
+        format string which will be passed ``**header``
+    """
     def __init__(self, db, fig_dispatch, text_dispatch, short_template):
         self.db = db
         self._hvw = HeaderViewerWidget(fig_dispatch, text_dispatch)
@@ -330,6 +360,8 @@ class BrowserWidget:
 
 class BrowserWindow(BrowserWidget):
     """
+    Window containing a search bar and results with a HeaderViewerWidget.
+
     Parameters
     ----------
     db : Broker
@@ -350,7 +382,7 @@ class BrowserWindow(BrowserWidget):
     ...
     >>> t = lambda header: header['plan_name']
     >>> s = '{start[plan_name]}'
-    >>> browser = BrokerWindow(db, f, t, s)
+    >>> browser = BrowserWindow(db, f, t, s)
     """
     def __init__(self, db, fig_dispatch, text_dispatch, short_template):
         super().__init__(db, fig_dispatch, text_dispatch, short_template)
