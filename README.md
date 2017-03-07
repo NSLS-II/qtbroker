@@ -15,24 +15,5 @@ ipython
 %run -i tutorial/generate_data.py  # executes some plans using RE, generating data in db
 ```
 
-Now run the files in this repo.
-
-```
-%run qtbroker/qtbroker.py
-%run qtbroker/cross_section_2d.py  # optional
-```
-
-If you use a ``db`` with many runs stored in it (e.g., a production one at a
-beamline) you should probably add a filter so that the results list for an
-unrestricted query is not enormous. For example
-``db.add_filter(cycle='2017-1')`` at CHX.
-
-And now set up a ``BrowserWindow`` instance. The tutorial has an example you can
-just run:
-
-```
-%run -i tutorial/start_run_browser.py
-browse()  # launches app
-```
-
-No runs will be displayed until you start typing search text.
+And now set up a ``BrowserWindow`` instance. See example.py in this repo to get
+started.
