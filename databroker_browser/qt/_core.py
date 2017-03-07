@@ -308,15 +308,15 @@ class BrowserWidget:
         expected signature: ``f(header, fig_factory)``
     text_dispatch : callable
         expected signature: ``f(header) -> str``
-    short_template : str
-        format string which will be passed ``**header``
+    result_dispatch : callable
+        expected signature: ``f(header) -> str``
     """
-    def __init__(self, db, fig_dispatch, text_dispatch, short_template):
+    def __init__(self, db, fig_dispatch, text_dispatch, result_dispatch):
         self.db = db
         self._hvw = HeaderViewerWidget(fig_dispatch, text_dispatch)
         self.fig_dispatch = fig_dispatch
         self.text_dispatch = text_dispatch
-        self.short_template = short_template
+        self.result_dispatch = result_dispatch
         self._results = QtWidgets.QListWidget()
         self._results.currentItemChanged.connect(
             self._on_results_selection_changed)
@@ -354,7 +354,7 @@ class BrowserWidget:
         self._results.clear()
         self._headers = self.db(**query)
         for h in self._headers:
-            item = QtWidgets.QListWidgetItem(self.short_template.format(**h))
+            item = QtWidgets.QListWidgetItem(self.result_dispatch(h))
             self._results.addItem(item)
 
 
@@ -369,8 +369,8 @@ class BrowserWindow(BrowserWidget):
         expected signature: ``f(header, fig_factory)``
     text_dispatch : callable
         expected signature: ``f(header) -> str``
-    short_template : str
-        format string which will be passed ``**header``
+    result_dispatch : callable
+        expected signature: ``f(header) -> str``
 
     Example
     -------
@@ -384,8 +384,8 @@ class BrowserWindow(BrowserWidget):
     >>> s = '{start[plan_name]}'
     >>> browser = BrowserWindow(db, f, t, s)
     """
-    def __init__(self, db, fig_dispatch, text_dispatch, short_template):
-        super().__init__(db, fig_dispatch, text_dispatch, short_template)
+    def __init__(self, db, fig_dispatch, text_dispatch, result_dispatch):
+        super().__init__(db, fig_dispatch, text_dispatch, result_dispatch)
         self._window = QtWidgets.QMainWindow()
         self._window.setCentralWidget(self.widget)
         self._window.show()
