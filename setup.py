@@ -8,4 +8,5 @@ setup(name='databroker-browser',
       cmdclass=versioneer.get_cmdclass(),
       packages=['databroker_browser',
                 'databroker_browser.qt'],
+      install_requires=['matplotlib', 'six', 'numpy'],
      )
